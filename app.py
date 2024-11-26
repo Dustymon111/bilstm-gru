@@ -259,8 +259,17 @@ def normalisasi(stock_options, selected_stock):
 #     st.plotly_chart(fig)
 
 
-def train(df, stock_label, X, y, window_size):
+def train(df_scaled, df, stock_label):
     with st.spinner('Initial Dataset Training'):
+        X = []
+        y = []
+        #Windowing
+        window_size = 30
+        for i in range(window_size, len(df_scaled)):
+            X.append(df_scaled[i-window_size:i])
+            y.append(df_scaled[i, df.columns.get_loc('Close')])
+        X, y = np.array(X), np.array(y)
+
         #Splitting
         split = int(len(X) * 0.8)
 
@@ -268,9 +277,6 @@ def train(df, stock_label, X, y, window_size):
         X_train, X_test = X[:split], X[split:]
         y_train, y_test = y[:split], y[split:]
 
-
-        st.write(X_train.shape)
-        st.write(X_test.shape)
         # Create an index for plotting
         dates = df.index[window_size:]  # Adjust dates to match the X dataset
 
@@ -340,8 +346,6 @@ def predict(stock_options, selected_stock):
     # Koneksi ke database
     db_connection = create_engine(db)
     conn = db_connection.connect()
-    X = []
-    y = []
 
     # Input jumlah hari prediksi
     prediction_days = st.sidebar.slider("Jumlah Hari Prediksi", min_value=1, max_value=30, value=7)
@@ -352,23 +356,21 @@ def predict(stock_options, selected_stock):
         max_value=date(2024, 10, 1),
         format="YYYY-MM-DD")
     
-    calculated_start_date = start_predict_date - timedelta(days=30)
     calculated_end_date = start_predict_date + timedelta(days=prediction_days)
     
-
     # Membaca data terbaru dari database
     query = f"""
         SELECT * 
         FROM {stock_options[selected_stock]} 
         ORDER BY Date ASC
     """
-    df_plot = pd.read_sql(query, conn, index_col=['Date'])
-    df_plot.columns = df_plot.columns.str.strip()
+    df_all = pd.read_sql(query, conn, index_col=['Date'])
+    df_all.columns = df_all.columns.str.strip()
 
 
     # Plotting
     plt.figure(figsize=(10, 5))
-    plt.plot(df_plot.index, df_plot['Close'], label='Dataset', color='blue')
+    plt.plot(df_all.index, df_all['Close'], label='Dataset', color='blue')
     plt.axvline(x=start_predict_date, color='black', linestyle='--', label='Split Point')
     plt.title('Dataset Predict Start Date')
     plt.xlabel('Date')
@@ -376,7 +378,7 @@ def predict(stock_options, selected_stock):
     plt.legend()
     st.pyplot(plt)
 
-       # Membaca data terbaru dari database
+    # Membaca data terbaru dari database
     query = f"""
         SELECT * 
         FROM {stock_options[selected_stock]} 
@@ -397,73 +399,74 @@ def predict(stock_options, selected_stock):
             else:
                 st.subheader("Data Terbaru")
                 st.dataframe(df.style.hide(axis="index"), use_container_width=True)
-                st.write(df.shape)
-                st.write(df.size)
 
                 # Preprocessing data untuk prediksi
                 scaler = MinMaxScaler()
                 df_scaled = scaler.fit_transform(df)
+                df_all_scaled = scaler.fit_transform(df_all)
 
-                #Windowing  
+                #Windowing
+                X_pred = []
+                y_pred = []
                 window_size = 30
                 for i in range(window_size, len(df_scaled)):
-                    X.append(df_scaled[i-window_size:i])
-                    y.append(df_scaled[i, df.columns.get_loc('Close')])
-                X, y = np.array(X), np.array(y)
+                    X_pred.append(df_scaled[i-window_size:i])
+                    y_pred.append(df_scaled[i, df.columns.get_loc('Close')])
+                X_pred, y_pred = np.array(X_pred), np.array(y_pred)
 
-                st.write("Windowing Done")
 
                 folder_path = os.path.join(os.getcwd(), "model")
                 model_path = f"{folder_path}/{stock_options[selected_stock]}-model.h5"
 
-
                 #Inisial Training
                 if not os.path.exists(model_path):
-                    st.write("Training dimulai")
-                    train(df, stock_options[selected_stock], X, y, window_size)
-
-
-
-                # Membentuk input untuk model (shape: [samples, timesteps, features])
-                last_sequence = df_scaled[-30:]  # Data 60 hari terakhir untuk input model
-                print(last_sequence[np.newaxis, :, :])
+                    train(df_all_scaled, df_all, stock_options[selected_stock])
 
                 # Memuat model
                 model = load_model(model_path)  # Ganti dengan path model Anda
 
                 # Melakukan prediksi
-                predictions = []
-                for _ in range(prediction_days):
-                    prediction = model.predict(last_sequence[np.newaxis, :, :])
-                    predictions.append(prediction[0, 0])
-                    # Update sequence dengan prediksi terbaru
-                    new_data = np.zeros((1, len(df.columns)))
-                    new_data[0, -1] = prediction[0, 0]  # Prediksi hanya pada kolom "Close"
-                    # print("new data:", new_data)
-                    last_sequence = np.append(last_sequence[1:], new_data, axis=0)
-                    print("last sequence:", last_sequence)
+                # predictions = []
+                prediction = model.predict(X_pred)
 
-                # Denormalisasi hasil prediksi
-                predictions = scaler.inverse_transform(
-                    np.hstack((np.zeros((len(predictions), len(df.columns)-1)), 
-                               np.array(predictions).reshape(-1, 1)))
-                )[:, -1]
+                dates = [start_predict_date + timedelta(days=i) for i in range(prediction_days)]
 
-                # close_scaler = MinMaxScaler(feature_range=(0, 1))
-                # close_prices = df[['Close']].values
-                # close_scaler.fit(close_prices)
-                # predictions = np.array(predictions).reshape(-1, 1)
-                # original_predictions = close_scaler.inverse_transform(predictions)
-                # st.write("Denormalized Predictions:", original_predictions)
-                
 
+                # for _ in range(prediction_days):
+                #     prediction = model.predict(X)
+                #     predictions.append(prediction[0, 0])
+                #     # Update sequence dengan prediksi terbaru
+                #     new_data = np.zeros((1, len(df.columns)))
+                #     new_data[0, -1] = prediction[0, 0]  # Prediksi hanya pada kolom "Close"
+                #     # print("new data:", new_data)
+                #     last_sequence = np.append(last_sequence[1:], new_data, axis=0)
+                #     print("last sequence:", last_sequence)
+
+                # # Denormalisasi hasil prediksi
+                # predictions = scaler.inverse_transform(
+                #     np.hstack((np.zeros((len(predictions), len(df.columns)-1)), 
+                #                np.array(predictions).reshape(-1, 1)))
+                # )[:, -1]
+
+                close_scaler = MinMaxScaler(feature_range=(0, 1))
+                close_prices = df[['Close']].values
+                close_scaler.fit(close_prices)
+
+
+                y_reshaped = y_pred.reshape(-1, 1)
+
+                # Inverse transform both `prediction` and `y`
+                original_predictions = close_scaler.inverse_transform(prediction).reshape(-1, 1)
+                original_actual = close_scaler.inverse_transform(y_reshaped).reshape(-1, 1)
+                                
                 # Hitung tanggal prediksi ke depan
-                future_dates = pd.date_range(start=df.index.min() + pd.Timedelta(days=1), periods=prediction_days)
-
                 prediction_df = pd.DataFrame({
-                    "Date": future_dates,
-                    "Predicted Close": predictions
-                })
+                    "Date": dates,  # Ensure `dates` matches the length of predictions and actuals
+                    "Prediction": original_predictions.flatten(),
+                    "Actual": original_actual.flatten()
+                }).set_index("Date")
+
+                prediction_df = prediction_df.astype(int)
 
                 st.subheader("Hasil Prediksi")
                 st.dataframe(prediction_df.style.hide(axis="index"), use_container_width=True)
@@ -475,7 +478,7 @@ def predict(stock_options, selected_stock):
                     x=df.index, y=df['Close'], mode='lines', name='Data Asli'
                 ))
                 fig.add_trace(go.Scatter(
-                    x=df.index, y=prediction_df['Predicted Close'], 
+                    x=df.index, y=prediction_df['Prediction'], 
                     mode='lines', name='Prediksi', line=dict(color="red", dash='dash')
                 ))
                 st.plotly_chart(fig)
