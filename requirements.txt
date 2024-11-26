@@ -1,5 +1,5 @@
 SQLAlchemy
-sklearn
+scikit-learn
 tensorflow
 matplotlib
 plotly
