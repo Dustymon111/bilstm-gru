@@ -1,13 +1,13 @@
 import streamlit as st
 import pandas as pd
 from datetime import date, timedelta
-import pymysql
+# import pymysql
 from sqlalchemy import create_engine
 from plotly import graph_objs as go
 from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.models import load_model
 import numpy as np
-from sklearn.model_selection import KFold
+# from sklearn.model_selection import KFold
 # from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Bidirectional, LSTM, GRU
