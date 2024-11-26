@@ -1,7 +1,8 @@
-sqlalchemy
+SQLAlchemy
 sklearn
 tensorflow
 matplotlib
 plotly
 pandas
+numpy
 streamlit
