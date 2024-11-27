@@ -365,7 +365,7 @@ def predict(stock_options, selected_stock):
     # Create a select box for weekdays
     start_predict_date = st.selectbox(
         "Tanggal Mulai Prediksi",
-        options=valid_dates,
+        options=valid_dates[30:-29],
         format_func=lambda x: x.strftime("%Y-%m-%d")
     )
 
@@ -379,10 +379,11 @@ def predict(stock_options, selected_stock):
     # Get the index of the selected start_predict_date in valid_dates
     start_index = valid_dates.index(start_predict_date)
 
-    # Get the next 7 valid dates starting from start_predict_date
+    # Get the next N valid dates starting from start_predict_date
     predicted_dates = valid_dates[start_index:start_index + prediction_days]
 
-    calculated_end_date = valid_dates[start_index + prediction_days]
+    calculated_end_date = valid_dates[start_index + prediction_days - 1]
+    st.write(calculated_end_date)
     
     # Membaca data terbaru dari database
     query = f"""
@@ -404,11 +405,11 @@ def predict(stock_options, selected_stock):
     plt.legend()
     st.pyplot(plt)
 
-    # Membaca data terbaru dari database
+    # Membaca data dari database
     query = f"""
         SELECT * 
         FROM {stock_options[selected_stock]} 
-        WHERE Date < '{calculated_end_date}' 
+        WHERE Date <= '{calculated_end_date}' 
         ORDER BY Date DESC
         LIMIT {prediction_days+30} 
     """
