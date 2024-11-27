@@ -335,6 +335,8 @@ def train(df_scaled, df, stock_label):
     st.success("Training Complete!")
 
 
+
+
 def predict(stock_options, selected_stock):
     st.markdown(
         """
@@ -350,11 +352,28 @@ def predict(stock_options, selected_stock):
     # Input jumlah hari prediksi
     prediction_days = st.sidebar.slider("Jumlah Hari Prediksi", min_value=1, max_value=30, value=7)
 
-    start_predict_date = st.slider("Tanggal Mulai Prediksi",
-        value=date(2014, 12, 3),
-        min_value=date(2014, 12, 3),
-        max_value=date(2024, 10, 1),
-        format="YYYY-MM-DD")
+    # Query the dates from your SQL table
+    query = f"SELECT DISTINCT Date FROM {stock_options[selected_stock]} ORDER BY Date ASC"
+    dates_df = pd.read_sql(query, conn)
+
+    # Ensure the Date column is of datetime type
+    dates_df['Date'] = pd.to_datetime(dates_df['Date'])
+
+    # Convert to a list of unique dates
+    valid_dates = dates_df['Date'].dt.date.tolist()
+
+    # Create a select box for weekdays
+    start_predict_date = st.selectbox(
+        "Tanggal Mulai Prediksi",
+        options=valid_dates,
+        format_func=lambda x: x.strftime("%Y-%m-%d")
+    )
+
+    # start_predict_date = st.slider("Tanggal Mulai Prediksi",
+    #     min_value=weekdays[0],
+    #     max_value=weekdays[-1],
+    #     value=weekdays[0],
+    #     format="YYYY-MM-DD")
     
     calculated_end_date = start_predict_date + timedelta(days=prediction_days)
     
@@ -384,10 +403,11 @@ def predict(stock_options, selected_stock):
         FROM {stock_options[selected_stock]} 
         WHERE Date < '{calculated_end_date}' 
         ORDER BY Date DESC
-        LIMIT {30+prediction_days} 
+        LIMIT {prediction_days+30} 
     """
     df = pd.read_sql(query, conn, index_col=['Date'])
     df.columns = df.columns.str.strip()
+    df.sort_index(inplace=True)
 
     
     # Tombol untuk memulai prediksi
@@ -426,27 +446,13 @@ def predict(stock_options, selected_stock):
                 model = load_model(model_path)  # Ganti dengan path model Anda
 
                 # Melakukan prediksi
-                # predictions = []
                 prediction = model.predict(X_pred)
 
-                dates = [start_predict_date + timedelta(days=i) for i in range(prediction_days)]
+                # Get the index of the selected start_predict_date in valid_dates
+                start_index = valid_dates.index(start_predict_date)
 
-
-                # for _ in range(prediction_days):
-                #     prediction = model.predict(X)
-                #     predictions.append(prediction[0, 0])
-                #     # Update sequence dengan prediksi terbaru
-                #     new_data = np.zeros((1, len(df.columns)))
-                #     new_data[0, -1] = prediction[0, 0]  # Prediksi hanya pada kolom "Close"
-                #     # print("new data:", new_data)
-                #     last_sequence = np.append(last_sequence[1:], new_data, axis=0)
-                #     print("last sequence:", last_sequence)
-
-                # # Denormalisasi hasil prediksi
-                # predictions = scaler.inverse_transform(
-                #     np.hstack((np.zeros((len(predictions), len(df.columns)-1)), 
-                #                np.array(predictions).reshape(-1, 1)))
-                # )[:, -1]
+                # Get the next 7 valid dates starting from start_predict_date
+                predicted_dates = valid_dates[start_index:start_index + prediction_days]
 
                 close_scaler = MinMaxScaler(feature_range=(0, 1))
                 close_prices = df[['Close']].values
@@ -461,7 +467,7 @@ def predict(stock_options, selected_stock):
                                 
                 # Hitung tanggal prediksi ke depan
                 prediction_df = pd.DataFrame({
-                    "Date": dates,  # Ensure `dates` matches the length of predictions and actuals
+                    "Date": predicted_dates,  # Ensure `dates` matches the length of predictions and actuals
                     "Prediction": original_predictions.flatten(),
                     "Actual": original_actual.flatten()
                 }).set_index("Date")
@@ -478,7 +484,7 @@ def predict(stock_options, selected_stock):
                     x=df.index, y=df['Close'], mode='lines', name='Data Asli'
                 ))
                 fig.add_trace(go.Scatter(
-                    x=df.index, y=prediction_df['Prediction'], 
+                    x=prediction_df.index, y=prediction_df['Prediction'], 
                     mode='lines', name='Prediksi', line=dict(color="red", dash='dash')
                 ))
                 st.plotly_chart(fig)
