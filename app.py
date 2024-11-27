@@ -374,8 +374,15 @@ def predict(stock_options, selected_stock):
     #     max_value=weekdays[-1],
     #     value=weekdays[0],
     #     format="YYYY-MM-DD")
+
     
-    calculated_end_date = start_predict_date + timedelta(days=prediction_days)
+    # Get the index of the selected start_predict_date in valid_dates
+    start_index = valid_dates.index(start_predict_date)
+
+    # Get the next 7 valid dates starting from start_predict_date
+    predicted_dates = valid_dates[start_index:start_index + prediction_days]
+
+    calculated_end_date = valid_dates[start_index + prediction_days]
     
     # Membaca data terbaru dari database
     query = f"""
@@ -447,12 +454,6 @@ def predict(stock_options, selected_stock):
 
                 # Melakukan prediksi
                 prediction = model.predict(X_pred)
-
-                # Get the index of the selected start_predict_date in valid_dates
-                start_index = valid_dates.index(start_predict_date)
-
-                # Get the next 7 valid dates starting from start_predict_date
-                predicted_dates = valid_dates[start_index:start_index + prediction_days]
 
                 close_scaler = MinMaxScaler(feature_range=(0, 1))
                 close_prices = df[['Close']].values
