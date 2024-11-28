@@ -7,11 +7,11 @@ from plotly import graph_objs as go
 from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.models import load_model
 import numpy as np
-# from sklearn.model_selection import KFold
-# from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Bidirectional, LSTM, GRU
 from tensorflow.keras.callbacks import EarlyStopping
+from sklearn.model_selection import TimeSeriesSplit
 import os
 import matplotlib.pyplot as plt
 
@@ -66,8 +66,8 @@ def main():
         data(stock_options, selected_stock, start_date, end_date)
     elif option == 'Normalisasi Data':
         normalisasi(stock_options, selected_stock)
-    # elif option == "Pengujian":
-    #     pengujian()
+    elif option == "Pengujian":
+        pengujian(stock_options, selected_stock)
     else:
         predict(stock_options, selected_stock)
 
@@ -176,87 +176,115 @@ def normalisasi(stock_options, selected_stock):
             st.error(f"Terjadi kesalahan: {e}")
 
 
-# def pengujian(stock_options, selected_stock):
-#     # Judul halaman
-#     st.markdown("<h2 style='text-align: center;'>Pengujian Model dengan K-Fold</h2>", unsafe_allow_html=True)
+def pengujian(stock_options, selected_stock):
+    # Judul halaman
+    st.markdown("<h2 style='text-align: center;'>Pengujian Model dengan K-Fold</h2>", unsafe_allow_html=True)
 
-#     # Pilihan jumlah K untuk K-Fold
-#     k = st.sidebar.number_input("Masukkan jumlah K (fold)", min_value=2, max_value=10, value=5, step=1)
+    # Pilihan jumlah K untuk K-Fold
+    k = st.sidebar.number_input("Masukkan jumlah K (fold)", min_value=2, max_value=10, value=5, step=1)
 
 
-#     # Ambil data saham dari MySQL
-#     db_connection = create_engine(db)
-#     conn = db_connection.connect()
+    # Ambil data saham dari MySQL
+    db_connection = create_engine(db)
+    conn = db_connection.connect()
 
-#     # Normalisasi data
-#     scaler = MinMaxScaler()
-#     features = ['Open', 'High', 'Low', 'Close', 'Volume']  # Kolom fitur
-#     df_scaled = scaler.fit_transform(df[features])
+    #Pemilihan data
+    selected_table = stock_options[selected_stock]
 
-#     # Pisahkan fitur dan target
-#     X = df_scaled[:, :-1]  # Semua kolom kecuali 'Close'
-#     y = df_scaled[:, -1]   # Kolom 'Close'
+    # Query ke database
+    query = f"SELECT * FROM {selected_table}"
+    df = pd.read_sql(query, conn, index_col=['Date'])
+    st.write("Dataset Pengujian")
+    st.dataframe(df, use_container_width=True)
+    df.columns = df.columns.str.strip()
 
-#     # K-Fold Cross-Validation
-#     kf = KFold(n_splits=k, shuffle=True, random_state=42)
-#     r2_scores, mse_scores, mae_scores, rmse_scores = [], [], [], []
+    if st.button(f"Mulai Pengujian"):
+        # Normalisasi data
+        scaler = MinMaxScaler()
+        df_scaled = scaler.fit_transform(df)
 
-#     actual_prices, predicted_prices = [], []  # Untuk grafik
+        X = []
+        y = []
+        window_size = 30
+        for i in range(window_size, len(df_scaled)):
+            X.append(df_scaled[i-window_size:i])
+            y.append(df_scaled[i, df.columns.get_loc('Close')])
+        X, y = np.array(X), np.array(y)
 
-#     for train_index, test_index in kf.split(X):
-#         X_train, X_test = X[train_index], X[test_index]
-#         y_train, y_test = y[train_index], y[test_index]
+        # K-Fold Cross-Validation
+        tscv = TimeSeriesSplit(n_splits=k)
+        r2_scores, mse_scores, mae_scores, rmse_scores = [], [], [], []
 
-#         # Prediksi
-#         predictions = model.predict(X_test)
-#         predicted_prices.extend(predictions.flatten())
-#         actual_prices.extend(y_test.flatten())
+        actual_prices, predicted_prices = [], []  # Untuk grafik
 
-#         # Evaluasi
-#         r2_scores.append(r2_score(y_test, predictions))
-#         mse_scores.append(mean_squared_error(y_test, predictions))
-#         mae_scores.append(mean_absolute_error(y_test, predictions))
-#         rmse_scores.append(np.sqrt(mean_squared_error(y_test, predictions)))
+        early_stopping = EarlyStopping(monitor='val_loss', patience=7, restore_best_weights=True)
 
-#     # Tabel metrik evaluasi
-#     metrics_df = pd.DataFrame({
-#         "Fold": list(range(1, k + 1)),
-#         "R-Squared": r2_scores,
-#         "MSE": mse_scores,
-#         "MAE": mae_scores,
-#         "RMSE": rmse_scores
-#     })
+        for train_index, test_index in tscv.split(X):
+            X_train, X_test = X[train_index], X[test_index]
+            y_train, y_test = y[train_index], y[test_index]
 
-#     st.subheader("Tabel Evaluasi Model")
-#     st.dataframe(metrics_df.style.format(precision=4), use_container_width=True)
+            # Build the model
+            model = Sequential()
+            model.add(Bidirectional(LSTM(units=50, return_sequences=True), input_shape=(X_train.shape[1], X_train.shape[2])))
+            model.add(GRU(units=50, return_sequences=False))
+            model.add(Dense(1))
+            
+            # Compile the model
+            model.compile(optimizer='adam', loss='mean_squared_error')
 
-#     # Rata-rata metrik
-#     avg_metrics = {
-#         "R-Squared": np.mean(r2_scores),
-#         "MSE": np.mean(mse_scores),
-#         "MAE": np.mean(mae_scores),
-#         "RMSE": np.mean(rmse_scores)
-#     }
+            # Train the model
+            model.fit(X_train, y_train, epochs=20, batch_size=32, verbose=0, callbacks=[early_stopping], validation_split=0.2)
 
-#     st.subheader("Rata-Rata Metrik")
-#     st.json(avg_metrics)
+            # Prediksi
+            predictions = model.predict(X_test)
+            predicted_prices.extend(predictions.flatten())
+            actual_prices.extend(y_test.flatten())
 
-#     # Grafik perbandingan aktual vs prediksi
-#     st.subheader("Grafik Perbandingan Harga Aktual dan Prediksi")
-#     comparison_df = pd.DataFrame({
-#         "Actual": actual_prices,
-#         "Predicted": predicted_prices
-#     })
+            # Evaluasi
+            r2_scores.append(r2_score(y_test, predictions))
+            mse_scores.append(mean_squared_error(y_test, predictions))
+            mae_scores.append(mean_absolute_error(y_test, predictions))
+            rmse_scores.append(np.sqrt(mean_squared_error(y_test, predictions)))
 
-#     fig = go.Figure()
-#     fig.add_trace(go.Scatter(y=comparison_df["Actual"], name="Actual", line=dict(color="blue")))
-#     fig.add_trace(go.Scatter(y=comparison_df["Predicted"], name="Predicted", line=dict(color="red")))
-#     fig.update_layout(
-#         title="Perbandingan Harga Aktual dan Prediksi",
-#         xaxis_title="Index",
-#         yaxis_title="Harga (Scaled)"
-#     )
-#     st.plotly_chart(fig)
+        # Tabel metrik evaluasi
+        metrics_df = pd.DataFrame({
+            "Fold": list(range(1, k + 1)),
+            "R-Squared": r2_scores,
+            "MSE": mse_scores,
+            "MAE": mae_scores,
+            "RMSE": rmse_scores
+        })
+
+        st.subheader("Tabel Evaluasi Model")
+        st.dataframe(metrics_df.style.format(precision=4), use_container_width=True)
+
+        # Rata-rata metrik
+        avg_metrics = {
+            "R-Squared": np.mean(r2_scores),
+            "MSE": np.mean(mse_scores),
+            "MAE": np.mean(mae_scores),
+            "RMSE": np.mean(rmse_scores)
+        }
+
+        st.subheader("Rata-Rata Metrik")
+        st.json(avg_metrics)
+
+        # Grafik perbandingan aktual vs prediksi
+        st.subheader("Grafik Perbandingan Harga Aktual dan Prediksi")
+        comparison_df = pd.DataFrame({
+            "Actual": actual_prices,
+            "Predicted": predicted_prices
+        })
+
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(y=comparison_df["Actual"], name="Actual", line=dict(color="blue")))
+        fig.add_trace(go.Scatter(y=comparison_df["Predicted"], name="Predicted", line=dict(color="red")))
+        fig.update_layout(
+            title="Perbandingan Harga Aktual dan Prediksi",
+            xaxis_title="Index",
+            yaxis_title="Harga (Scaled)"
+        )
+        st.plotly_chart(fig)
 
 
 def train(df_scaled, df, stock_label):
