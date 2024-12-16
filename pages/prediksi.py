@@ -272,13 +272,11 @@ def predict():
                 mse_scores= mean_squared_error(original_actual, original_predictions)
                 mae_scores= mean_absolute_error(original_actual, original_predictions)
                 rmse_scores= np.sqrt(mean_squared_error(original_actual, original_predictions))
-                mape_scores = np.mean(np.abs((original_actual - original_predictions) / original_actual)) * 100  # MAPE in percentage
 
                 metrics = {
                 "MSE": mse_scores,
                 "MAE": mae_scores,
                 "RMSE": rmse_scores,
-                "MAPE": mape_scores
                 }
 
                 df_metrics = pd.DataFrame([metrics])

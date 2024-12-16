@@ -30,8 +30,8 @@ def pengujian():
     if st.button("Mulai Pengujian",use_container_width=True):
             # Normalisasi data
             scaler = MinMaxScaler()
-            # st.dataframe(df)
             df_scaled = pd.DataFrame(scaler.fit_transform(df.iloc[:, 1:]), columns=df.columns[1:])
+
             # st.dataframe(df_scaled)
             X, y = [], []
             window_size = 30
@@ -42,7 +42,7 @@ def pengujian():
             X, y = np.array(X), np.array(y)
 
             tscv = TimeSeriesSplit(n_splits=k)
-            r2_scores, mse_scores, mae_scores, rmse_scores, mape_scores = [], [], [], [], []
+            mse_scores, mae_scores, rmse_scores= [], [], []
 
             actual_prices, predicted_prices = [], [] #utk grafik
             early_stopping = EarlyStopping(monitor='val_loss', patience=7, restore_best_weights=True)
@@ -65,26 +65,20 @@ def pengujian():
 
                     # Prediksi
                     predictions = model.predict(X_test)
-                    predicted_prices.extend(predictions.flatten())
-                    actual_prices.extend(y_test)
         
                     # Evaluasi
-                    r2_scores.append(r2_score(y_test, predictions))
                     mse_scores.append(mean_squared_error(y_test, predictions))
                     mae_scores.append(mean_absolute_error(y_test, predictions))
                     rmse_scores.append(np.sqrt(mean_squared_error(y_test, predictions)))
-                    mape = np.mean(np.abs((y_test - predictions) / y_test)) * 100  # MAPE in percentage
-                    mape_scores.append(mape)
+                    
 
                    
 
             # Tabel metrik evaluasi
             metrics_df = pd.DataFrame({
-                "R-Squared": r2_scores,
                 "MSE": mse_scores,
                 "MAE": mae_scores,
                 "RMSE": rmse_scores,
-                "MAPE": mape_scores
             },index=list(range(1, k + 1)))
 
             st.html("<h3 style='text-align:center;'>Hasil Pengujian</h3>")
@@ -94,11 +88,9 @@ def pengujian():
 
             # Rata-rata metrik
             avg_metrics = {
-                "R-Squared": np.mean(r2_scores),
                 "MSE": np.mean(mse_scores),
                 "MAE": np.mean(mae_scores),
                 "RMSE": np.mean(rmse_scores),
-                "MAPE": np.mean(mape_scores)
             }
 
             # Konversi JSON ke DataFrame
