@@ -32,12 +32,11 @@ def pengujian():
             scaler = MinMaxScaler()
             df_scaled = pd.DataFrame(scaler.fit_transform(df.iloc[:, 1:]), columns=df.columns[1:])
 
-            # st.dataframe(df_scaled)
             X, y = [], []
             window_size = 30
             close_index = 3
             for i in range(window_size, len(df_scaled)):
-                X.append(df_scaled.iloc[i-window_size:i].values)  # Gunakan .iloc untuk slicing
+                X.append(df_scaled.iloc[i-window_size:i].values)
                 y.append(df_scaled.iloc[i, close_index]) 
             X, y = np.array(X), np.array(y)
 
@@ -46,59 +45,70 @@ def pengujian():
 
             actual_prices, predicted_prices = [], [] #utk grafik
             early_stopping = EarlyStopping(monitor='val_loss', patience=7, restore_best_weights=True)
-
-            for i, (train_index, test_index) in enumerate(tscv.split(X, y)):
+            for i, (train_index, test_index) in enumerate(tscv.split(X)):
                 with st.spinner(f"Proses Pengujian Lipatan K-Fold ke-{i + 1} dari {k}"):
                     X_train, X_test = X[train_index], X[test_index]
                     y_train, y_test = y[train_index], y[test_index]
 
-                    model = Sequential()
-                    model.add(Bidirectional(LSTM(units=50, return_sequences=True), input_shape=(X_train.shape[1], X_train.shape[2])))
-                    model.add(GRU(units=50, return_sequences=False))
-                    model.add(Dense(1))
+                index_lengths = pd.DataFrame({
+                    'Fold': [i + 1],
+                    'Train Index Length': [len(train_index)],
+                    'Test Index Length': [len(test_index)]
+                })
 
-                    # Compile the model
-                    model.compile(optimizer='adam', loss='mean_squared_error')
+                # Display the DataFrame in Streamlit
+                index_lengths.set_index('Fold', inplace=True)
+                st.write(f"Train Date Range {df['Date'][train_index][0]} s.d {df['Date'][train_index][len(train_index) - 1]}")
+                st.write(f"Test Date Range {df['Date'][test_index][0]} s.d {df['Date'][test_index][len(test_index) - 1]}")
+                st.dataframe(index_lengths)
 
-                    # Train the model
-                    model.fit(X_train, y_train, epochs=20, batch_size=32, callbacks=[early_stopping])
+            #         model = Sequential()
+            #         model.add(Bidirectional(LSTM(units=50, return_sequences=True), input_shape=(X_train.shape[1], X_train.shape[2])))
+            #         model.add(GRU(units=50, return_sequences=False))
+            #         model.add(Dense(1))
 
-                    # Prediksi
-                    predictions = model.predict(X_test)
+            #         # Compile the model
+            #         model.compile(optimizer='adam', loss='mean_squared_error')
+
+            #         # Train the model
+            #         model.fit(X_train, y_train, epochs=20, batch_size=32, callbacks=[early_stopping])
+
+            #         # Prediksi
+            #         predictions = model.predict(X_test)
         
-                    # Evaluasi
-                    mse_scores.append(mean_squared_error(y_test, predictions))
-                    mae_scores.append(mean_absolute_error(y_test, predictions))
-                    rmse_scores.append(np.sqrt(mean_squared_error(y_test, predictions)))
+            #         # Evaluasi
+            #         mse_scores.append(mean_squared_error(y_test, predictions))
+            #         mae_scores.append(mean_absolute_error(y_test, predictions))
+            #         rmse_scores.append(np.sqrt(mean_squared_error(y_test, predictions)))
                     
 
                    
 
-            # Tabel metrik evaluasi
-            metrics_df = pd.DataFrame({
-                "MSE": mse_scores,
-                "MAE": mae_scores,
-                "RMSE": rmse_scores,
-            },index=list(range(1, k + 1)))
+            # # Tabel metrik evaluasi
+            # metrics_df = pd.DataFrame({
+            #     "MSE": mse_scores,
+            #     "MAE": mae_scores,
+            #     "RMSE": rmse_scores,
+            # },index=list(range(1, k + 1)))
 
-            st.html("<h3 style='text-align:center;'>Hasil Pengujian</h3>")
+            # st.html("<h3 style='text-align:center;'>Hasil Pengujian</h3>")
 
-            st.html("<b>Tabel Evaluasi Model</b>")
-            st.dataframe(metrics_df.style.format(precision=4),use_container_width=True)
+            # st.html("<b>Tabel Evaluasi Model</b>")
+            # st.dataframe(metrics_df.style.format(precision=4),use_container_width=True)
 
-            # Rata-rata metrik
-            avg_metrics = {
-                "MSE": np.mean(mse_scores),
-                "MAE": np.mean(mae_scores),
-                "RMSE": np.mean(rmse_scores),
-            }
+            # # Rata-rata metrik
+            # avg_metrics = {
+            #     "MSE": np.mean(mse_scores),
+            #     "MAE": np.mean(mae_scores),
+            #     "RMSE": np.mean(rmse_scores),
+            # }
 
-            # Konversi JSON ke DataFrame
-            df_metrics = pd.DataFrame([avg_metrics])
+            # # Konversi JSON ke DataFrame
+            # df_metrics = pd.DataFrame([avg_metrics])
 
-            # Tampilkan sebagai DataFrame
-            st.write("**Rata-Rata Metrik**")
-            st.dataframe(df_metrics,hide_index=True,use_container_width=True)
+            # # Tampilkan sebagai DataFrame
+            # st.write("**Rata-Rata Metrik**")
+            # st.dataframe(df_metrics,hide_index=True,use_container_width=True)
 
     col6,col7,col8= st.columns([3,1,1])
     col6.text("")

@@ -269,9 +269,9 @@ def predict():
                 st.html("<b>Hasil Prediksi</b>")
                 st.dataframe(prediction_df.style.hide(axis="index"), use_container_width=True)  
 
-                mse_scores= mean_squared_error(original_actual, original_predictions)
-                mae_scores= mean_absolute_error(original_actual, original_predictions)
-                rmse_scores= np.sqrt(mean_squared_error(original_actual, original_predictions))
+                mse_scores= mean_squared_error(y_pred, prediction)
+                mae_scores= mean_absolute_error(y_pred, prediction)
+                rmse_scores= np.sqrt(mean_squared_error(y_pred, prediction))
 
                 metrics = {
                 "MSE": mse_scores,
