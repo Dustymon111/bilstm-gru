@@ -67,6 +67,7 @@ def main():
         col00.text("")
         if col11.button("Logout"):
             st.session_state.pop("authenticated", None)
+            st.switch_page('./login.py')   
         method = st.selectbox("", placeholder="Pilih perusahaan", options=["Saham Aplikasi","Upload CSV"])
         
         if method == "Saham Aplikasi":
