@@ -90,7 +90,7 @@ def pengujian():
                     model.compile(optimizer='adam', loss='mean_squared_error')
 
                     # Train the model
-                    model.fit(X_train, y_train, epochs=200, batch_size=16, validation_data=(X_test, y_test), callbacks=[early_stopping])
+                    model.fit(X_train, y_train, epochs=100, batch_size=32, validation_data=(X_test, y_test), callbacks=[early_stopping])
                 
                     # Prediksi
                     predictions = model.predict(X_test)

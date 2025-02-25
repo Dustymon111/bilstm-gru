@@ -59,7 +59,7 @@ def train_real(df, df_normalized, stock_label):
 
 
         early_stopping = EarlyStopping(monitor='val_loss', patience=15, restore_best_weights=True)
-        history = model.fit(X_train, y_train, epochs=200, batch_size=16, validation_data=(X_test, y_test), callbacks=[early_stopping])
+        history = model.fit(X_train, y_train, epochs=100, batch_size=32, validation_data=(X_test, y_test), callbacks=[early_stopping])
 
         # Predict on test set
         predicted = model.predict(X_test)
@@ -127,8 +127,6 @@ def predict_real():
 
     # Input jumlah hari prediksi
     prediction_days = st.slider("Jumlah Hari Prediksi", min_value=1, max_value=30, value=7)
-    
-
 
 
     # Plotting

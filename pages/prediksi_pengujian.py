@@ -62,35 +62,34 @@ def train(df, df_normalized, stock_label):
 
         # Compile the model
         model.compile(optimizer='adam', loss='mean_absolute_error')
-        early_stopping = EarlyStopping(monitor='val_loss', patience=15, restore_best_weights=True)
+        early_stopping = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
 
-        st.write("Fitting Model")
-        model.fit(X_train, y_train, epochs=200, batch_size=16, validation_data=(X_test, y_test), callbacks=[early_stopping])
+        model.fit(X_train, y_train, epochs=100, batch_size=32, validation_data=(X_test, y_test), callbacks=[early_stopping])
 
         # Create a separate scaler for y (Close values)
         close_scaler = MinMaxScaler(feature_range=(0, 1))
         close_prices = df[['Close']].values
-        close_scaler.fit(close_prices)  # Fit on all 'Close' values
+        close_scaler.fit(close_prices)  # Fit on all 'Close' values     
 
         testing = model.predict(X_test)
 
         # Inverse-transform predictions and y_test
-        predicted_stock_price = close_scaler.inverse_transform(testing.reshape(-1, 1))
-        y_test_actual = close_scaler.inverse_transform(y_test.reshape(-1, 1))
+        # predicted_stock_price = close_scaler.inverse_transform(testing.reshape(-1, 1))
+        # y_test_actual = close_scaler.inverse_transform(y_test.reshape(-1, 1))
 
         
-        test_dates = df.index[len(X_train) + window_size:len(X_train) + window_size + len(y_test)]
-        # Create the plot
-        plt.figure(figsize=(10, 6))
-        plt.plot(test_dates, y_test_actual, color='blue', label='Actual Stock Price')
-        plt.plot(test_dates, predicted_stock_price, color='red', label='Predicted Stock Price')
-        plt.title("Stock Price Prediction")
-        plt.xlabel("Date")
-        plt.ylabel("Stock Price")
-        plt.legend()
+        # test_dates = df.index[len(X_train) + window_size:len(X_train) + window_size + len(y_test)]
+        # # Create the plot
+        # plt.figure(figsize=(10, 6))
+        # plt.plot(test_dates, y_test_actual, color='blue', label='Actual Stock Price')
+        # plt.plot(test_dates, predicted_stock_price, color='red', label='Predicted Stock Price')
+        # plt.title("Stock Price Prediction")
+        # plt.xlabel("Date")
+        # plt.ylabel("Stock Price")
+        # plt.legend()
 
-        # Render the plot in Streamlit
-        st.pyplot(plt)
+        # # Render the plot in Streamlit
+        # st.pyplot(plt)
 
         folder_path = os.path.join(os.getcwd(), "model/test_model")
         model.save(f'{folder_path}/{stock_label}-model.h5')
